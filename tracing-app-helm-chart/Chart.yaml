@@ -1,0 +1,17 @@
+apiVersion: v2
+name: tracing-app
+description: A Helm chart for request tracing with structured JSON logging
+type: application
+version: 0.1.0
+appVersion: "1.0"
+keywords:
+  - tracing
+  - logging
+  - observability
+  - nginx
+  - grafana
+  - loki
+home: https://github.com/your-org/tracing-app
+maintainers:
+  - name: Your Name
+    email: your.email@example.com

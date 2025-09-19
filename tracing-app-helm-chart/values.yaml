@@ -1,0 +1,22 @@
+# Simple values for tracing app
+webapp:
+  name: webapp
+  replicas: 1
+  image:
+    repository: nginx
+    tag: alpine
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+cronjob:
+  name: request-sender
+  schedule: "*/1 * * * *"  # Every minute
+  image:
+    repository: curlimages/curl
+    tag: latest

@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Values.cronjob.name }}-cronjob
+  labels:
+    app: {{ .Values.cronjob.name }}
+    {{- include "tracing-app.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cronjob.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: {{ .Values.cronjob.name }}
+            image: "{{ .Values.cronjob.image.repository }}:{{ .Values.cronjob.image.tag }}"
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # Generate correlation ID
+              CORRELATION_ID="req-$(date +%Y%m%d-%H%M%S)-$(shuf -i 10000-99999 -n 1)"
+              
+              echo "🚀 Sending request with correlation ID: $CORRELATION_ID"
+              
+              # Make request to webapp
+              curl -H "correlation-id: $CORRELATION_ID" \
+                   -H "User-Agent: TracingBot/1.0" \
+                   -s -o /dev/null \
+                   http://{{ .Values.webapp.name }}-service/
+              
+              echo "✅ Request completed"
+          restartPolicy: OnFailure

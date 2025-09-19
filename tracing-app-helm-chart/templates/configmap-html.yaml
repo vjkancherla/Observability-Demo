@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.webapp.name }}-html-config
+  labels:
+    app: {{ .Values.webapp.name }}
+    {{- include "tracing-app.labels" . | nindent 4 }}
+data:
+  index.html: |
+    {{ .Files.Get "config/index.html" | nindent 4 }}

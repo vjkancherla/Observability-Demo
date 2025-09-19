@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.webapp.name }}-deployment
+  labels:
+    app: {{ .Values.webapp.name }}
+    {{- include "tracing-app.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.webapp.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.webapp.name }}
+      {{- include "tracing-app.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.webapp.name }}
+        {{- include "tracing-app.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: {{ .Values.webapp.name }}
+        image: "{{ .Values.webapp.image.repository }}:{{ .Values.webapp.image.tag }}"
+        imagePullPolicy: {{ .Values.webapp.image.pullPolicy }}
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+        - name: html-content
+          mountPath: /usr/share/nginx/html
+        {{- if .Values.webapp.resources }}
+        resources:
+          {{- toYaml .Values.webapp.resources | nindent 10 }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: {{ .Values.webapp.name }}-nginx-config
+      - name: html-content
+        configMap:
+          name: {{ .Values.webapp.name }}-html-config

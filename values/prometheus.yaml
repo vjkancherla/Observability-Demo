@@ -1,0 +1,47 @@
+grafana:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    retention: 2h
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          resources:
+            requests:
+              storage: 200Mi
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          resources:
+            requests:
+              storage: 200Mi
+
+nodeExporter:
+  enabled: false
+
+grafana:
+  enabled: false
+
+kubeStateMetrics:
+  enabled: true

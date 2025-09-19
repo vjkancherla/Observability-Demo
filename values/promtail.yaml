@@ -1,0 +1,40 @@
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+config:
+  clients:
+    - url: http://dev-loki.observability.svc.cluster.local:3100/loki/api/v1/push
+  
+  # Override pipeline stages to handle CRI + JSON
+  snippets:
+    pipelineStages:
+      # First stage: Parse CRI format
+      - cri: {}
+      # Second stage: Parse the JSON content from the CRI message
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            service: service
+            method: method
+            path: path
+            status: status
+            correlation_id: correlation_id
+            user_agent: user_agent
+            request_time: request_time
+            pod_name: pod_name
+      # Third stage: Promote fields to labels
+      - labels:
+          service:
+          method:
+          status:
+          correlation_id:
+      # Fourth stage: Set timestamp from JSON if available
+      - timestamp:
+          source: timestamp
+          format: RFC3339
