@@ -43,4 +43,84 @@ dashboardProviders:
 dashboards:
   default:
     tracing-logs:
-      file: dashboards/tracing-app-logs.json
+      json: |
+        {
+          "annotations": {
+            "list": []
+          },
+          "editable": true,
+          "fiscalYearStartMonth": 0,
+          "graphTooltip": 0,
+          "id": 1,
+          "links": [],
+          "panels": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "fieldConfig": {
+                "defaults": {},
+                "overrides": []
+              },
+              "gridPos": {
+                "h": 20,
+                "w": 24,
+                "x": 0,
+                "y": 0
+              },
+              "id": 1,
+              "options": {
+                "dedupStrategy": "none",
+                "enableInfiniteScrolling": false,
+                "enableLogDetails": true,
+                "prettifyLogMessage": false,
+                "showCommonLabels": false,
+                "showLabels": true,
+                "showTime": true,
+                "sortOrder": "Descending",
+                "wrapLogMessage": true
+              },
+              "pluginVersion": "12.0.0",
+              "targets": [
+                {
+                  "expr": "{app=\"tracing-app\"} | json | correlation_id=~\"$correlation_id\"",
+                  "refId": "A"
+                }
+              ],
+              "title": "Logs",
+              "type": "logs"
+            }
+          ],
+          "refresh": "30s",
+          "schemaVersion": 41,
+          "tags": [],
+          "templating": {
+            "list": [
+              {
+                "current": {
+                  "text": ".*",
+                  "value": ".*"
+                },
+                "name": "correlation_id",
+                "type": "textbox",
+                "label": "Correlation ID",
+                "options": [
+                  {
+                    "text": ".*",
+                    "value": ".*"
+                  }
+                ]
+              }
+            ]
+          },
+          "time": {
+            "from": "now-1h",
+            "to": "now"
+          },
+          "timepicker": {},
+          "timezone": "browser",
+          "title": "Logs",
+          "uid": "simple-logs",
+          "version": 2
+        }
