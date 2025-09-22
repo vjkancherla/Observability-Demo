@@ -1,12 +1,20 @@
-# 🚀 Minimal Observability Stack with Tracing App
+# 🚀 Observability Stack with Correlation-Based Alerting
 
-This project provides a **self-contained observability playground** on Kubernetes using:
+This project provides a **complete observability playground** on Kubernetes featuring **exact correlation ID tracking** from CronJob failures to specific log entries.
+
+## Architecture
+
+![Observability Stack Flow](observability_stack_diagram.svg)
+
+## Stack Components
 
 - **k3d** (lightweight k3s-based cluster)
-- **Prometheus** (metrics)
-- **Loki + Promtail** (logs)
-- **Grafana** (dashboards)
-- **Tracing App** (sample webapp with structured JSON logging + correlation IDs)
+- **Prometheus** (metrics collection & alerting)
+- **Pushgateway** (CronJob metrics storage)
+- **Loki + Promtail** (log collection & storage)
+- **Grafana** (unified dashboards)
+- **Alertmanager** (alert routing with webhooks)
+- **Tracing App** (demo webapp with structured JSON logging)
 
 ---
 
@@ -27,79 +35,151 @@ Spin up the full stack with a single command:
 ```bash
 ./deploy.sh
 ```
+
 This will:
 
-1. Create a local **k3d** cluster.  
-2. Add required **Helm repositories**.  
-3. Deploy Prometheus, Loki, Promtail, Grafana, and the Tracing App.  
-4. Start port-forwards for Grafana.  
+1. Create a local **k3d** cluster
+2. Add required **Helm repositories**
+3. Deploy **Prometheus** (metrics & alerting)
+4. Deploy **Pushgateway** (CronJob metrics storage)
+5. Deploy **Loki + Promtail** (log collection)
+6. Deploy **Grafana** (dashboards)
+7. Apply **custom PrometheusRules** and **AlertmanagerConfig**
+8. Deploy **Tracing App** (demo webapp)
+9. Start port-forwards for all services
 
-🧹 Cleanup
-Tear everything down:
-
+🧹 **Cleanup:**
 ```bash
 ./cleanup.sh
 ```
-This will stop port-forwards and delete the k3d cluster.
-
-## 📊 Grafana
-
-- URL: http://localhost:3000  
-- Username: `admin`  
-- Password: `admin` (configurable in `values/grafana.yaml`)  
-
-### Preconfigured Datasources
-
-- Prometheus → `http://dev-prometheus-kube-promet-prometheus.observability.svc.cluster.local:9090`  
-- Loki → `http://dev-loki.observability.svc.cluster.local:3100`  
-
-### Preloaded Dashboards
-
-- **Logs** (`uid: simple-logs`)  
-  - Queries `{app="tracing-app"}`  
-  - Provides a textbox variable `correlation_id`  
-  - Displays logs with labels & timestamps  
 
 ---
 
-## 📋 Features
+## 🎯 Key Innovation: Exact Correlation Tracking
 
-- End-to-end observability with **metrics, logs, and dashboards**  
-- **Tracing App** with structured JSON logging, request ID + correlation ID headers  
-- Endpoints: `/`, `/health`, `/metrics`, `/trace`  
-- CronJob generates demo traffic with correlation IDs  
+This stack implements **precise correlation between alerts and logs**:
 
----
+1. **CronJob** generates unique `correlation_id` (e.g., `req-20250922-143021-87654`)
+2. **Pushgateway** stores metrics with the exact correlation ID
+3. **Prometheus** alerts include the correlation ID as a label
+4. **Alerts contain direct Grafana links** filtered to that specific correlation ID
+5. **One-click debugging** from alert to exact log entry
 
-## 📂 Project Structure
-
+### Alert Flow
 ```
-deploy.sh # End-to-end deployment script
-cleanup.sh # Teardown script
-values/ # Helm values for Prometheus, Loki, Promtail, Grafana
-tracing-app-helm-chart/ # Helm chart for the tracing demo app
+CronJob fails → Pushgateway metrics → Prometheus alert → 
+Webhook with Grafana link → Click → Exact logs for that request
 ```
 
 ---
 
-## 🔍 Example Flow
+## 🔗 Access Points
 
-1. CronJob sends a request every minute with a unique `correlation_id`.  
-2. Nginx logs the request in JSON format.  
-3. Promtail collects logs and pushes them to Loki.  
-4. Grafana dashboard lets you query logs filtered by `correlation_id`.  
+After deployment, access these services:
+
+- **Grafana**: http://localhost:3000 (`admin`/`admin`)
+- **Prometheus**: http://localhost:9090  
+- **Alertmanager**: http://localhost:9093
+- **Pushgateway**: http://localhost:9091
 
 ---
 
-##  ⚡ Quick Demo
+## 🚨 Testing Alerts
+
+**Trigger a CronJob failure:**
+```bash
+# Scale down webapp to cause 503 errors
+kubectl scale deployment webapp-deployment -n my-demo --replicas=0
+
+# Wait 1-2 minutes for CronJob to run and fail
+# Check your webhook endpoint for alerts with exact correlation IDs
 ```
+
+**Restore service:**
+```bash
+kubectl scale deployment webapp-deployment -n my-demo --replicas=1
+```
+
+---
+
+## 📊 Pre-configured Components
+
+### Grafana Dashboards
+- **Logs Dashboard** (`uid: simple-logs`)
+  - Queries `{app="tracing-app"}`
+  - **Correlation ID filter** variable
+  - Direct links from alerts
+
+### Datasources
+- **Prometheus** → `http://dev-prometheus-kube-prom-prometheus.observability.svc.cluster.local:9090`
+- **Loki** → `http://dev-loki.observability.svc.cluster.local:3100`
+
+### Alert Rules
+- **CronJobFailedWithExactCorrelationID**: Fires when CronJob fails, includes correlation ID
+- **CronJobNotRunningRecently**: Fires when CronJob hasn't run in 5+ minutes
+
+---
+
+## 📁 Project Structure
+
+```
+deploy.sh                     # Main deployment script
+cleanup.sh                   # Teardown script
+observability-stack-diagram.svg  # Architecture diagram
+values/                      # Helm configuration files
+├── prometheus.yaml         # Prometheus stack config
+├── pushgateway.yaml        # Pushgateway config
+├── loki.yaml              # Loki config
+├── promtail.yaml          # Promtail config
+└── grafana.yaml           # Grafana config
+alerts/                     # Custom alerting rules
+├── cronjob-alerts.yaml    # PrometheusRule definitions
+└── alertmanager-webhook.yaml  # AlertmanagerConfig
+tracing-app-helm-chart/     # Demo application
+```
+
+---
+
+## 🔍 Example Correlation Workflow
+
+1. **CronJob runs** with correlation ID `req-20250922-143021-87654`
+2. **Request fails** (webapp scaled to 0 replicas)
+3. **Pushgateway stores** metrics with correlation ID label
+4. **Prometheus alert fires** with correlation ID included
+5. **Webhook receives alert** with direct Grafana URL:
+   ```
+   http://localhost:3000/d/simple-logs/logs?var-correlation_id=req-20250922-143021-87654
+   ```
+6. **Click link** → See exact logs for that failed request
+7. **Root cause analysis** in seconds, not minutes
+
+---
+
+## ⚡ Quick Start
+
+```bash
+# Deploy entire stack
 ./deploy.sh
 
-# Open Grafana at http://localhost:3000
+# Open Grafana
+open http://localhost:3000
 
-Then open the Logs dashboard in Grafana and filter by the emitted correlation_id.
+# Trigger test alert
+kubectl scale deployment webapp-deployment -n my-demo --replicas=0
 
-1. The CronJob automatically sends requests to the Tracing App with unique `correlation_id` headers.  
-2. Logs are collected by Promtail → stored in Loki → visualized in Grafana.  
-3. Open the **Logs dashboard** and filter by `correlation_id` to trace requests end-to-end.  
+# Check your webhook endpoint for correlation-based alerts
 ```
+
+---
+
+## 🎯 Why This Matters
+
+Traditional observability stacks require manual correlation between alerts and logs. This implementation provides:
+
+- **Zero manual correlation** - alerts include exact correlation IDs  
+- **Direct navigation** - one-click from alert to specific logs
+- **Faster MTTR** - reduce debugging time from minutes to seconds
+- **Production patterns** - uses industry-standard tools (Pushgateway, Prometheus, etc.)
+- **Scalable design** - works for multiple services and complex deployments
+
+Perfect for demonstrating modern observability practices and correlation-based debugging workflows.

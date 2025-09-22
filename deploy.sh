@@ -31,6 +31,12 @@ helm upgrade --install dev-prometheus prometheus-community/kube-prometheus-stack
 wait_for_release dev-prometheus observability
 echo "   Prometheus deployed"
 
+echo "Deploying Pushgateway..."
+helm upgrade --install prometheus-pushgateway prometheus-community/prometheus-pushgateway \
+  --version 3.4.1 --namespace observability -f values/pushgateway.yaml --wait --timeout=5m
+wait_for_release prometheus-pushgateway observability
+echo "   Pushgateway deployed"
+
 echo "Deploying Loki (6.40.0)..."
 helm upgrade --install dev-loki grafana/loki \
   --version 6.40.0 --namespace observability -f values/loki.yaml --wait --timeout=5m
@@ -49,6 +55,11 @@ helm upgrade --install dev-grafana grafana/grafana \
 wait_for_release dev-grafana observability
 echo "   Grafana deployed"
 
+echo "Applying custom PrometheusRules and AlertmanagerConfig..."
+kubectl apply -f alerts/cronjob-alerts.yaml
+kubectl apply -f alerts/alertmanager-webhook.yaml
+echo "   Custom rules and Alertmanager config applied"
+
 echo "Deploying Tracing App..."
 helm upgrade --install dev-tracing ./tracing-app-helm-chart \
   --namespace my-demo --wait --timeout=5m
@@ -58,9 +69,15 @@ echo "   Tracing app deployed"
 # Update the port-forward section
 echo "Starting port-forwards..."
 kubectl port-forward -n observability svc/dev-grafana 3000:80 >/dev/null 2>&1 &
-echo "   Port-forwards started (background)"
+kubectl port-forward -n observability svc/dev-prometheus-kube-prom-prometheus 9090:9090 >/dev/null 2>&1 &
+kubectl port-forward -n observability svc/dev-prometheus-kube-prom-alertmanager 9093:9093 >/dev/null 2>&1 &
+kubectl port-forward -n observability svc/prometheus-pushgateway 9091:9091 >/dev/null 2>&1 &
+echo "   Port-forwards started (Grafana:3000, Prometheus:9090, Alertmanager:9093, Pushgateway:9091)"
 
 echo ""
 echo "Deployment complete!"
 echo "   Grafana: http://localhost:3000 (admin/admin)"
+echo "   Prometheus: http://localhost:9090"
+echo "   Alertmanager: http://localhost:9093"
+echo "   Pushgateway: http://localhost:9091"
 echo "   Stop: ./cleanup.sh"

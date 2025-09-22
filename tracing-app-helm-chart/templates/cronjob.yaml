@@ -1,33 +1,97 @@
+# CronJob with Pushgateway integration for exact correlation ID tracking
+---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: {{ .Values.cronjob.name }}-cronjob
+  name: request-sender-pushgateway
+  namespace: my-demo
   labels:
-    app: {{ .Values.cronjob.name }}
-    {{- include "tracing-app.labels" . | nindent 4 }}
+    app: request-sender-pushgateway
 spec:
-  schedule: {{ .Values.cronjob.schedule | quote }}
+  schedule: "*/1 * * * *"
   jobTemplate:
     spec:
       template:
+        metadata:
+          labels:
+            app: request-sender-pushgateway
         spec:
           containers:
-          - name: {{ .Values.cronjob.name }}
-            image: "{{ .Values.cronjob.image.repository }}:{{ .Values.cronjob.image.tag }}"
+          - name: request-sender
+            image: curlimages/curl:latest
             command:
             - /bin/sh
             - -c
             - |
               # Generate correlation ID
               CORRELATION_ID="req-$(date +%Y%m%d-%H%M%S)-$(shuf -i 10000-99999 -n 1)"
+              JOB_NAME="request-sender"
               
-              echo "🚀 Sending request with correlation ID: $CORRELATION_ID"
+              # Use the Helm-deployed Pushgateway service name
+              PUSHGATEWAY_URL="http://prometheus-pushgateway.observability.svc.cluster.local:9091"
+              
+              echo "Starting request with correlation ID: $CORRELATION_ID"
+              echo "Pushgateway URL: $PUSHGATEWAY_URL"
+              
+              # Push start metrics to Pushgateway
+              START_TIME=$(date +%s)
+              cat <<EOF | curl --data-binary @- "${PUSHGATEWAY_URL}/metrics/job/${JOB_NAME}/correlation_id/${CORRELATION_ID}"
+              # HELP cronjob_request_info Information about CronJob request
+              # TYPE cronjob_request_info gauge
+              cronjob_request_info{correlation_id="${CORRELATION_ID}",status="running",service="request-sender"} 1
+              
+              # HELP cronjob_request_start_timestamp_seconds Start time of CronJob request
+              # TYPE cronjob_request_start_timestamp_seconds gauge
+              cronjob_request_start_timestamp_seconds{correlation_id="${CORRELATION_ID}"} ${START_TIME}
+              EOF
+              
+              echo "Start metrics pushed successfully"
               
               # Make request to webapp
-              curl -H "correlation-id: $CORRELATION_ID" \
+              RESPONSE_CODE=$(curl -H "correlation-id: $CORRELATION_ID" \
                    -H "User-Agent: TracingBot/1.0" \
-                   -s -o /dev/null \
-                   http://{{ .Values.webapp.name }}-service/
+                   -s -o /dev/null -w "%{http_code}" \
+                   http://webapp-service/ || echo "000")
               
-              echo "✅ Request completed"
+              END_TIME=$(date +%s)
+              DURATION=$((END_TIME - START_TIME))
+              
+              echo "Response code: $RESPONSE_CODE"
+              echo "Duration: ${DURATION}s"
+              
+              # Determine status
+              if [ "$RESPONSE_CODE" != "200" ]; then
+                STATUS="failed"
+                echo "Request failed with code: $RESPONSE_CODE"
+                echo "Grafana link: http://localhost:3000/d/simple-logs/logs?orgId=1&from=now-1h&to=now&var-correlation_id=$CORRELATION_ID"
+              else
+                STATUS="success"
+                echo "Request completed successfully"
+              fi
+              
+              # Push final metrics including correlation ID
+              cat <<EOF | curl --data-binary @- "${PUSHGATEWAY_URL}/metrics/job/${JOB_NAME}/correlation_id/${CORRELATION_ID}"
+              # HELP cronjob_request_info Information about CronJob request
+              # TYPE cronjob_request_info gauge
+              cronjob_request_info{correlation_id="${CORRELATION_ID}",status="${STATUS}",response_code="${RESPONSE_CODE}",service="request-sender"} 1
+              
+              # HELP cronjob_request_duration_seconds Duration of CronJob request
+              # TYPE cronjob_request_duration_seconds gauge
+              cronjob_request_duration_seconds{correlation_id="${CORRELATION_ID}",status="${STATUS}"} ${DURATION}
+              
+              # HELP cronjob_request_timestamp_seconds Completion time of CronJob request
+              # TYPE cronjob_request_timestamp_seconds gauge
+              cronjob_request_timestamp_seconds{correlation_id="${CORRELATION_ID}",status="${STATUS}"} ${END_TIME}
+              
+              # HELP cronjob_last_run_info Latest CronJob run information
+              # TYPE cronjob_last_run_info gauge
+              cronjob_last_run_info{correlation_id="${CORRELATION_ID}",status="${STATUS}",response_code="${RESPONSE_CODE}",service="request-sender"} 1
+              EOF
+              
+              echo "Final metrics pushed to Pushgateway successfully"
+              
+              # Exit with error if request failed
+              if [ "$RESPONSE_CODE" != "200" ]; then
+                exit 1
+              fi
           restartPolicy: OnFailure

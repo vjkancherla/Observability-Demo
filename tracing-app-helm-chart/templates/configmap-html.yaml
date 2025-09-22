@@ -7,4 +7,4 @@ metadata:
     {{- include "tracing-app.labels" . | nindent 4 }}
 data:
   index.html: |
-    {{ .Files.Get "config/index.html" | nindent 4 }}
+    {{ .Files.Get "files/index.html" | nindent 4 }}

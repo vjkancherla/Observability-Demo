@@ -1,0 +1,62 @@
+# AlertmanagerConfig for Pushgateway alerts with exact correlation
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: pushgateway-exact-correlation
+  namespace: observability
+  labels:
+    alertmanagerConfig: main
+spec:
+  route:
+    groupBy: ['alertname', 'correlation_id']
+    groupWait: 5s
+    groupInterval: 30s
+    repeatInterval: 2m
+    receiver: 'pushgateway-correlation-webhook'
+
+  receivers:
+  - name: 'pushgateway-correlation-webhook'
+    webhookConfigs:
+    - url: 'https://webhook.site/f353f13b-d8dd-4bfd-bd00-7820663c7f0b'
+      sendResolved: true
+      httpConfig:
+        headers:
+          Content-Type: application/json
+          X-Alert-Source: prometheus-pushgateway-helm
+      title: 'Pushgateway: Exact Correlation Alert'
+      text: |
+        **{{ .GroupLabels.alertname }}**
+        
+        **Exact Correlation ID:** `{{ .GroupLabels.correlation_id }}`
+        **Service:** {{ .GroupLabels.service }}
+        **Status:** {{ .Status }}
+        **Alert Time:** {{ now | date "2006-01-02 15:04:05" }}
+        
+        {{ range .Alerts }}
+        **INVESTIGATION LINKS:**
+        
+        **Direct Grafana Link (Filtered by Correlation ID):**
+        {{ .Annotations.grafana_url }}
+        
+        **Pushgateway Metrics:**
+        {{ .Annotations.pushgateway_url }}
+        
+        **Request Details:**
+        - **Correlation ID:** {{ .Labels.correlation_id }}
+        - **Response Code:** {{ .Labels.response_code }}
+        - **Service:** {{ .Labels.service }}
+        - **Status:** {{ .Labels.status }}
+        - **Alert:** {{ .Labels.alertname }}
+        - **Failure Time:** {{ .StartsAt | date "2006-01-02 15:04:05" }}
+        
+        **Summary:** {{ .Annotations.summary }}
+        **Description:** {{ .Annotations.description }}
+        {{ end }}
+        
+        **Powered by Prometheus Pushgateway (deployed via official Helm chart)**
+        
+        **Investigation Steps:**
+        1. Click Grafana link → See exact logs for this correlation ID
+        2. Check Pushgateway dashboard → See all recent job metrics
+        3. Analyze logs for root cause of the failure

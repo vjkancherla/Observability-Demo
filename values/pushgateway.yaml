@@ -1,0 +1,13 @@
+# Minimal Pushgateway values for observability integration
+serviceMonitor:
+  enabled: true
+  namespace: observability
+  honorLabels: true
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi

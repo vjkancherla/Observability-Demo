@@ -1,0 +1,98 @@
+<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <!-- CronJob -->
+  <rect x="50" y="50" width="120" height="60" fill="#e1f5fe" stroke="#0277bd" stroke-width="2" rx="5"/>
+  <text x="110" y="75" text-anchor="middle" font-size="12" font-weight="bold">CronJob</text>
+  <text x="110" y="90" text-anchor="middle" font-size="10">correlation_id</text>
+
+  <!-- Webapp -->
+  <rect x="250" y="50" width="120" height="60" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="2" rx="5"/>
+  <text x="310" y="75" text-anchor="middle" font-size="12" font-weight="bold">Webapp</text>
+  <text x="310" y="90" text-anchor="middle" font-size="10">(Nginx)</text>
+
+  <!-- Pushgateway -->
+  <rect x="450" y="50" width="120" height="60" fill="#fff3e0" stroke="#f57c00" stroke-width="2" rx="5"/>
+  <text x="510" y="75" text-anchor="middle" font-size="12" font-weight="bold">Pushgateway</text>
+  <text x="510" y="90" text-anchor="middle" font-size="10">metrics storage</text>
+
+  <!-- Promtail -->
+  <rect x="250" y="150" width="120" height="60" fill="#e8f5e8" stroke="#388e3c" stroke-width="2" rx="5"/>
+  <text x="310" y="175" text-anchor="middle" font-size="12" font-weight="bold">Promtail</text>
+  <text x="310" y="190" text-anchor="middle" font-size="10">log collector</text>
+
+  <!-- Prometheus -->
+  <rect x="450" y="250" width="120" height="60" fill="#ffebee" stroke="#d32f2f" stroke-width="2" rx="5"/>
+  <text x="510" y="275" text-anchor="middle" font-size="12" font-weight="bold">Prometheus</text>
+  <text x="510" y="290" text-anchor="middle" font-size="10">metrics and alerts</text>
+
+  <!-- Loki -->
+  <rect x="250" y="250" width="120" height="60" fill="#e8f5e8" stroke="#388e3c" stroke-width="2" rx="5"/>
+  <text x="310" y="275" text-anchor="middle" font-size="12" font-weight="bold">Loki</text>
+  <text x="310" y="290" text-anchor="middle" font-size="10">log storage</text>
+
+  <!-- Alertmanager -->
+  <rect x="600" y="250" width="120" height="60" fill="#fff9c4" stroke="#f9a825" stroke-width="2" rx="5"/>
+  <text x="660" y="275" text-anchor="middle" font-size="12" font-weight="bold">Alertmanager</text>
+  <text x="660" y="290" text-anchor="middle" font-size="10">alert routing</text>
+
+  <!-- Grafana -->
+  <rect x="350" y="400" width="120" height="60" fill="#e3f2fd" stroke="#1976d2" stroke-width="2" rx="5"/>
+  <text x="410" y="425" text-anchor="middle" font-size="12" font-weight="bold">Grafana</text>
+  <text x="410" y="440" text-anchor="middle" font-size="10">dashboards</text>
+
+  <!-- Webhook -->
+  <rect x="600" y="400" width="120" height="60" fill="#fce4ec" stroke="#c2185b" stroke-width="2" rx="5"/>
+  <text x="660" y="425" text-anchor="middle" font-size="12" font-weight="bold">Webhook</text>
+  <text x="660" y="440" text-anchor="middle" font-size="10">notifications</text>
+
+  <!-- Arrows -->
+  <!-- CronJob to Webapp -->
+  <path d="M 170 80 L 240 80" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <text x="205" y="75" font-size="10" fill="#333">HTTP</text>
+
+  <!-- CronJob to Pushgateway -->
+  <path d="M 170 70 Q 350 -5 440 70" stroke="#f57c00" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <text x="300" y="0" font-size="10" fill="#f57c00">push metrics</text>
+
+  <!-- Webapp to Promtail -->
+  <path d="M 310 110 L 310 140" stroke="#388e3c" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <text x="320" y="130" font-size="10" fill="#388e3c">logs</text>
+
+  <!-- Promtail to Loki -->
+  <path d="M 310 210 L 310 240" stroke="#388e3c" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <text x="320" y="230" font-size="10" fill="#388e3c">ship</text>
+
+  <!-- Pushgateway to Prometheus -->
+  <path d="M 510 110 L 510 240" stroke="#d32f2f" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <text x="520" y="175" font-size="10" fill="#d32f2f">scrape</text>
+
+  <!-- Prometheus to Alertmanager -->
+  <path d="M 570 280 L 590 280" stroke="#f9a825" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <text x="580" y="275" font-size="10" fill="#f9a825">alerts</text>
+
+  <!-- Prometheus to Grafana -->
+  <path d="M 480 310 L 440 390" stroke="#1976d2" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <text x="440" y="350" font-size="10" fill="#1976d2">query</text>
+
+  <!-- Loki to Grafana -->
+  <path d="M 340 310 L 380 390" stroke="#1976d2" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <text x="350" y="350" font-size="10" fill="#1976d2">query</text>
+
+  <!-- Alertmanager to Webhook -->
+  <path d="M 660 310 L 660 390" stroke="#c2185b" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+  <text x="670" y="350" font-size="10" fill="#c2185b">notify</text>
+
+  <!-- Flow labels -->
+  <text x="50" y="30" font-size="14" font-weight="bold" fill="#333">Data Flow:</text>
+  <text x="50" y="520" font-size="12" fill="#666">1. CronJob sends request + pushes metrics with correlation_id</text>
+  <text x="50" y="540" font-size="12" fill="#666">2. Webapp logs request → Promtail → Loki</text>
+  <text x="50" y="560" font-size="12" fill="#666">3. Prometheus scrapes Pushgateway, alerts on failures</text>
+  <text x="50" y="580" font-size="12" fill="#666">4. Alert includes correlation_id → direct Grafana link</text>
+
+  <!-- Arrow marker -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+    refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+    </marker>
+  </defs>
+</svg>

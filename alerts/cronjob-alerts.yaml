@@ -1,0 +1,49 @@
+# PrometheusRule for Pushgateway metrics with exact correlation ID
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cronjob-pushgateway-correlation-alerts
+  namespace: observability
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: cronjob-pushgateway-correlation
+    interval: 30s
+    rules:
+    # Alert when CronJob fails with exact correlation ID
+    - alert: CronJobFailedWithExactCorrelationID
+      expr: |
+        cronjob_request_info{status="failed"} == 1
+      for: 0m
+      labels:
+        severity: warning
+        service: tracing-app
+        component: request-sender-pushgateway
+        correlation_id: "{{ $labels.correlation_id }}"
+      annotations:
+        summary: "CronJob failed - Correlation ID: {{ $labels.correlation_id }}"
+        description: |
+          CronJob request failed with exact correlation tracking via Pushgateway.
+          Correlation ID: {{ $labels.correlation_id }}
+          Response Code: {{ $labels.response_code }}
+          Duration: {{ with query "cronjob_request_duration_seconds{correlation_id='" }}{{ $labels.correlation_id }}{{ "'}" }}{{ range . }}{{ .Value }}{{ end }}{{ end }}s
+        grafana_url: "http://localhost:3000/d/simple-logs/logs?orgId=1&from=now-1h&to=now&timezone=browser&var-correlation_id={{ $labels.correlation_id }}&refresh=30s"
+        pushgateway_url: "http://localhost:9091"
+        
+    # Alert when CronJob hasn't run recently
+    - alert: CronJobNotRunningRecently
+      expr: |
+        (time() - on() group_left() max(cronjob_request_timestamp_seconds)) > 300
+      for: 2m
+      labels:
+        severity: critical
+        service: tracing-app
+        component: request-sender-pushgateway
+      annotations:
+        summary: "CronJob hasn't run in over 5 minutes"
+        description: "The request-sender CronJob should run every minute but the last recorded run was over 5 minutes ago."
+        grafana_url: "http://localhost:3000/d/simple-logs/logs?orgId=1&from=now-30m&to=now"
+
+---
