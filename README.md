@@ -4,7 +4,25 @@ This project provides a **complete observability playground** on Kubernetes feat
 
 ## Architecture
 
-![Observability Stack Flow](observability_stack_diagram.svg)
+![Observability Stack Flow](observability_stack_diagram_with_bg.svg)
+
+## End-to-End Flow
+```
+CronJob (correlation_id)
+↓ (HTTP request)
+Webapp (logs error with correlation_id)
+↓ (structured logs)
+Promtail → Loki (stores logs)
+CronJob (same correlation_id)
+↓ (push metrics)
+Pushgateway (stores with correlation_id label)
+↓ (Prometheus scrapes)
+Prometheus (detects failure, correlation_id in alert)
+↓ (fires alert)
+Alertmanager → Webhook (alert payload includes correlation_id + Grafana link)
+↓ (notification)
+Operator clicks link → Grafana (filtered to exact correlation_id) → Exact logs
+```
 
 ## Stack Components
 
@@ -84,21 +102,70 @@ After deployment, access these services:
 
 ---
 
-## 🚨 Testing Alerts
+## 🚨 Webhook Configuration
 
-**Trigger a CronJob failure:**
+This project uses [webhook.site](https://webhook.site/) to simulate a Slack/Teams webhook endpoint for alert notifications.
+
+**Setup:**
+1. Go to https://webhook.site/
+2. Copy your unique webhook URL
+3. Update `alerts/alertmanager-webhook.yaml` with your URL:
+   ```yaml
+   webhookConfigs:
+   - url: 'https://webhook.site/YOUR-UNIQUE-ID'
+   ```
+4. Reapply the configuration:
+   ```bash
+   kubectl apply -f alerts/alertmanager-webhook.yaml
+   ```
+
+When alerts fire, you'll see the full alert payload (including correlation ID and Grafana URL) at your webhook.site URL.
+
+---
+
+## 🧪 Testing Alerts
+
+Alerts are **automatically triggered** by the CronJob's built-in error simulation:
+
+- **CronJob runs every minute**
+- **At minutes 0, 5, 10, 15, 20, etc.** (divisible by 5): Hits `/simulate-error` → Returns HTTP 500
+- **Other minutes**: Hits `/` → Returns HTTP 200 (success)
+
+**Watch alerts in real-time:**
 ```bash
-# Scale down webapp to cause 503 errors
+# Monitor CronJob execution
+watch kubectl get jobs -n my-demo -l app=request-sender-conditional
+
+# Check webhook.site for alert notifications
+# Alerts will appear every 5 minutes with correlation IDs and Grafana links
+
+# View active alerts in Prometheus
+curl -s http://localhost:9090/api/v1/alerts | jq '.data.alerts'
+```
+
+**Manual failure test (optional):**
+```bash
+# Scale down webapp to cause unexpected 503 errors
 kubectl scale deployment webapp-deployment -n my-demo --replicas=0
 
-# Wait 1-2 minutes for CronJob to run and fail
-# Check your webhook endpoint for alerts with exact correlation IDs
-```
-
-**Restore service:**
-```bash
+# Restore service
 kubectl scale deployment webapp-deployment -n my-demo --replicas=1
 ```
+
+---
+
+## ✅ Verification
+
+For detailed step-by-step verification of the entire observability stack, see:
+
+**📋 [Observability Verification Checklist](docs/observability-verification-checklist.md)**
+
+This guide covers:
+- Port forwarding setup (required for all API access)
+- Verifying CronJob → Pushgateway → Prometheus flow
+- Checking ServiceMonitor and PrometheusRule configuration
+- Confirming alerts are firing correctly
+- Troubleshooting common label selector issues
 
 ---
 
@@ -111,7 +178,7 @@ kubectl scale deployment webapp-deployment -n my-demo --replicas=1
   - Direct links from alerts
 
 ### Datasources
-- **Prometheus** → `http://dev-prometheus-kube-prom-prometheus.observability.svc.cluster.local:9090`
+- **Prometheus** → `http://dev-prometheus-kube-promet-prometheus.observability.svc.cluster.local:9090`
 - **Loki** → `http://dev-loki.observability.svc.cluster.local:3100`
 
 ### Alert Rules
@@ -125,7 +192,7 @@ kubectl scale deployment webapp-deployment -n my-demo --replicas=1
 ```
 deploy.sh                     # Main deployment script
 cleanup.sh                   # Teardown script
-observability-stack-diagram.svg  # Architecture diagram
+observability-stack-diagram_with_bg.svg  # Architecture diagram
 values/                      # Helm configuration files
 ├── prometheus.yaml         # Prometheus stack config
 ├── pushgateway.yaml        # Pushgateway config
@@ -133,9 +200,11 @@ values/                      # Helm configuration files
 ├── promtail.yaml          # Promtail config
 └── grafana.yaml           # Grafana config
 alerts/                     # Custom alerting rules
-├── cronjob-alerts.yaml    # PrometheusRule definitions
+├── preometheus-rules-cronjob-alerts    # PrometheusRule definitions
 └── alertmanager-webhook.yaml  # AlertmanagerConfig
 tracing-app-helm-chart/     # Demo application
+docs/                       # Documentation
+└── observability-verification-checklist.md  # Verification guide
 ```
 
 ---

@@ -56,7 +56,7 @@ wait_for_release dev-grafana observability
 echo "   Grafana deployed"
 
 echo "Applying custom PrometheusRules and AlertmanagerConfig..."
-kubectl apply -f alerts/cronjob-alerts.yaml
+kubectl apply -f alerts/preometheus-rules-cronjob-alerts.yaml
 kubectl apply -f alerts/alertmanager-webhook.yaml
 echo "   Custom rules and Alertmanager config applied"
 
@@ -69,8 +69,8 @@ echo "   Tracing app deployed"
 # Update the port-forward section
 echo "Starting port-forwards..."
 kubectl port-forward -n observability svc/dev-grafana 3000:80 >/dev/null 2>&1 &
-kubectl port-forward -n observability svc/dev-prometheus-kube-prom-prometheus 9090:9090 >/dev/null 2>&1 &
-kubectl port-forward -n observability svc/dev-prometheus-kube-prom-alertmanager 9093:9093 >/dev/null 2>&1 &
+kubectl port-forward -n observability svc/dev-prometheus-kube-promet-prometheus 9090:9090 >/dev/null 2>&1 &
+kubectl port-forward -n observability svc/dev-prometheus-kube-promet-alertmanager 9093:9093 >/dev/null 2>&1 &
 kubectl port-forward -n observability svc/prometheus-pushgateway 9091:9091 >/dev/null 2>&1 &
 echo "   Port-forwards started (Grafana:3000, Prometheus:9090, Alertmanager:9093, Pushgateway:9091)"
 

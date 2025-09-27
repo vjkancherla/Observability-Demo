@@ -7,6 +7,7 @@ metadata:
   labels:
     prometheus: kube-prometheus
     role: alert-rules
+    release: dev-prometheus
 spec:
   groups:
   - name: cronjob-pushgateway-correlation
@@ -24,14 +25,10 @@ spec:
         correlation_id: "{{ $labels.correlation_id }}"
       annotations:
         summary: "CronJob failed - Correlation ID: {{ $labels.correlation_id }}"
-        description: |
-          CronJob request failed with exact correlation tracking via Pushgateway.
-          Correlation ID: {{ $labels.correlation_id }}
-          Response Code: {{ $labels.response_code }}
-          Duration: {{ with query "cronjob_request_duration_seconds{correlation_id='" }}{{ $labels.correlation_id }}{{ "'}" }}{{ range . }}{{ .Value }}{{ end }}{{ end }}s
+        description: "CronJob request failed with exact correlation tracking via Pushgateway. Correlation ID: {{ $labels.correlation_id }}, Response Code: {{ $labels.response_code }}, Job Type: {{ $labels.job_type }}, Endpoint: {{ $labels.endpoint }}"
         grafana_url: "http://localhost:3000/d/simple-logs/logs?orgId=1&from=now-1h&to=now&timezone=browser&var-correlation_id={{ $labels.correlation_id }}&refresh=30s"
         pushgateway_url: "http://localhost:9091"
-        
+    
     # Alert when CronJob hasn't run recently
     - alert: CronJobNotRunningRecently
       expr: |
@@ -45,5 +42,3 @@ spec:
         summary: "CronJob hasn't run in over 5 minutes"
         description: "The request-sender CronJob should run every minute but the last recorded run was over 5 minutes ago."
         grafana_url: "http://localhost:3000/d/simple-logs/logs?orgId=1&from=now-30m&to=now"
-
----

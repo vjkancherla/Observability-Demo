@@ -3,6 +3,8 @@ serviceMonitor:
   enabled: true
   namespace: observability
   honorLabels: true
+  additionalLabels:
+    release: dev-prometheus  # This makes Prometheus pick it up
 
 resources:
   requests:

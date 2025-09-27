@@ -1,20 +1,23 @@
-# CronJob with Pushgateway integration for exact correlation ID tracking
+# Single CronJob with conditional endpoint logic
 ---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: request-sender-pushgateway
+  name: request-sender-conditional
   namespace: my-demo
   labels:
-    app: request-sender-pushgateway
+    app: request-sender-conditional
 spec:
-  schedule: "*/1 * * * *"
+  schedule: "*/1 * * * *"  # Every minute
+  successfulJobsHistoryLimit: 2  # Keep last 3 successful job runs
+  failedJobsHistoryLimit: 3       # Keep last 5 failed job runs
   jobTemplate:
     spec:
+      backoffLimit: 0
       template:
         metadata:
           labels:
-            app: request-sender-pushgateway
+            app: request-sender-conditional
         spec:
           containers:
           - name: request-sender
@@ -25,73 +28,81 @@ spec:
             - |
               # Generate correlation ID
               CORRELATION_ID="req-$(date +%Y%m%d-%H%M%S)-$(shuf -i 10000-99999 -n 1)"
-              JOB_NAME="request-sender"
+              JOB_NAME="request-sender-conditional"
               
-              # Use the Helm-deployed Pushgateway service name
               PUSHGATEWAY_URL="http://prometheus-pushgateway.observability.svc.cluster.local:9091"
               
-              echo "Starting request with correlation ID: $CORRELATION_ID"
-              echo "Pushgateway URL: $PUSHGATEWAY_URL"
+              # Get current minute and check if divisible by 5
+              CURRENT_MINUTE=$(date +%M)
+              # Remove leading zero for arithmetic
+              CURRENT_MINUTE=$((10#$CURRENT_MINUTE))
               
-              # Push start metrics to Pushgateway
+              if [ $((CURRENT_MINUTE % 5)) -eq 0 ]; then
+                # Every 5th minute - hit error endpoint
+                ENDPOINT="/simulate-error"
+                EXPECTED_CODE="500"
+                JOB_TYPE="error_simulation"
+                echo "ERROR SIMULATION: Minute $CURRENT_MINUTE - hitting error endpoint"
+              else
+                # Regular minutes - hit success endpoint
+                ENDPOINT="/"
+                EXPECTED_CODE="200"
+                JOB_TYPE="success"
+                echo "SUCCESS: Minute $CURRENT_MINUTE - hitting regular endpoint"
+              fi
+              
+              echo "Using correlation ID: $CORRELATION_ID"
+              echo "Target endpoint: $ENDPOINT"
+              
+              # Push start metrics
               START_TIME=$(date +%s)
               cat <<EOF | curl --data-binary @- "${PUSHGATEWAY_URL}/metrics/job/${JOB_NAME}/correlation_id/${CORRELATION_ID}"
-              # HELP cronjob_request_info Information about CronJob request
-              # TYPE cronjob_request_info gauge
-              cronjob_request_info{correlation_id="${CORRELATION_ID}",status="running",service="request-sender"} 1
-              
-              # HELP cronjob_request_start_timestamp_seconds Start time of CronJob request
-              # TYPE cronjob_request_start_timestamp_seconds gauge
+              cronjob_request_info{correlation_id="${CORRELATION_ID}",status="running",service="request-sender-conditional",job_type="${JOB_TYPE}",endpoint="${ENDPOINT}"} 1
               cronjob_request_start_timestamp_seconds{correlation_id="${CORRELATION_ID}"} ${START_TIME}
               EOF
               
-              echo "Start metrics pushed successfully"
-              
-              # Make request to webapp
+              # Make request to determined endpoint
               RESPONSE_CODE=$(curl -H "correlation-id: $CORRELATION_ID" \
-                   -H "User-Agent: TracingBot/1.0" \
+                   -H "User-Agent: TracingBot-Conditional/1.0" \
                    -s -o /dev/null -w "%{http_code}" \
-                   http://webapp-service/ || echo "000")
+                   "http://webapp-service${ENDPOINT}" || echo "000")
               
               END_TIME=$(date +%s)
               DURATION=$((END_TIME - START_TIME))
               
-              echo "Response code: $RESPONSE_CODE"
-              echo "Duration: ${DURATION}s"
+              echo "Response code: $RESPONSE_CODE (expected: $EXPECTED_CODE)"
               
-              # Determine status
-              if [ "$RESPONSE_CODE" != "200" ]; then
-                STATUS="failed"
-                echo "Request failed with code: $RESPONSE_CODE"
-                echo "Grafana link: http://localhost:3000/d/simple-logs/logs?orgId=1&from=now-1h&to=now&var-correlation_id=$CORRELATION_ID"
+              # Determine final status
+              if [ "$RESPONSE_CODE" = "$EXPECTED_CODE" ]; then
+                if [ "$JOB_TYPE" = "error_simulation" ]; then
+                  STATUS="failed"  # Expected failure for error simulation
+                  echo "ERROR SIMULATION: Expected failure occurred - webapp logged error with correlation ID"
+                else
+                  STATUS="success"  # Expected success
+                  echo "SUCCESS: Request completed successfully"
+                fi
               else
-                STATUS="success"
-                echo "Request completed successfully"
+                STATUS="failed"  # Unexpected result
+                echo "UNEXPECTED: Got $RESPONSE_CODE but expected $EXPECTED_CODE"
               fi
               
-              # Push final metrics including correlation ID
+              # Push final metrics
               cat <<EOF | curl --data-binary @- "${PUSHGATEWAY_URL}/metrics/job/${JOB_NAME}/correlation_id/${CORRELATION_ID}"
-              # HELP cronjob_request_info Information about CronJob request
-              # TYPE cronjob_request_info gauge
-              cronjob_request_info{correlation_id="${CORRELATION_ID}",status="${STATUS}",response_code="${RESPONSE_CODE}",service="request-sender"} 1
-              
-              # HELP cronjob_request_duration_seconds Duration of CronJob request
-              # TYPE cronjob_request_duration_seconds gauge
-              cronjob_request_duration_seconds{correlation_id="${CORRELATION_ID}",status="${STATUS}"} ${DURATION}
-              
-              # HELP cronjob_request_timestamp_seconds Completion time of CronJob request
-              # TYPE cronjob_request_timestamp_seconds gauge
-              cronjob_request_timestamp_seconds{correlation_id="${CORRELATION_ID}",status="${STATUS}"} ${END_TIME}
-              
-              # HELP cronjob_last_run_info Latest CronJob run information
-              # TYPE cronjob_last_run_info gauge
-              cronjob_last_run_info{correlation_id="${CORRELATION_ID}",status="${STATUS}",response_code="${RESPONSE_CODE}",service="request-sender"} 1
+              cronjob_request_info{correlation_id="${CORRELATION_ID}",status="${STATUS}",response_code="${RESPONSE_CODE}",service="request-sender-conditional",job_type="${JOB_TYPE}",endpoint="${ENDPOINT}"} 1
+              cronjob_request_duration_seconds{correlation_id="${CORRELATION_ID}",status="${STATUS}",job_type="${JOB_TYPE}"} ${DURATION}
+              cronjob_request_timestamp_seconds{correlation_id="${CORRELATION_ID}",status="${STATUS}",job_type="${JOB_TYPE}"} ${END_TIME}
+              cronjob_last_run_info{correlation_id="${CORRELATION_ID}",status="${STATUS}",response_code="${RESPONSE_CODE}",service="request-sender-conditional",job_type="${JOB_TYPE}"} 1
               EOF
               
-              echo "Final metrics pushed to Pushgateway successfully"
+              echo "Metrics pushed successfully"
               
-              # Exit with error if request failed
-              if [ "$RESPONSE_CODE" != "200" ]; then
+              if [ "$JOB_TYPE" = "error_simulation" ]; then
+                echo "ERROR SIMULATION: Check Grafana logs with correlation ID: $CORRELATION_ID"
+                echo "Grafana link: http://localhost:3000/d/simple-logs/logs?var-correlation_id=$CORRELATION_ID"
+              fi
+              
+              # Exit with error only for failed requests (includes expected error simulations)
+              if [ "$STATUS" = "failed" ]; then
                 exit 1
               fi
-          restartPolicy: OnFailure
+          restartPolicy: Never
