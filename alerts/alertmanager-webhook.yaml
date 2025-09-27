@@ -16,5 +16,5 @@ spec:
   receivers:
   - name: 'pushgateway-correlation-webhook'
     webhookConfigs:
-    - url: 'https://webhook.site/f353f13b-d8dd-4bfd-bd00-7820663c7f0b'
+    - url: 'https://webhook-test.com/b05fc179dd8b97132b436df4cb3dfdd1'
       sendResolved: true

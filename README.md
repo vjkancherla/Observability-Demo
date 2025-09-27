@@ -104,22 +104,22 @@ After deployment, access these services:
 
 ## 🚨 Webhook Configuration
 
-This project uses [webhook.site](https://webhook.site/) to simulate a Slack/Teams webhook endpoint for alert notifications.
+This project uses [webhook-test.com](https://webhook-test.com/) to simulate a Slack/Teams webhook endpoint for alert notifications.
 
 **Setup:**
-1. Go to https://webhook.site/
+1. Go to https://webhook-test.com/
 2. Copy your unique webhook URL
 3. Update `alerts/alertmanager-webhook.yaml` with your URL:
    ```yaml
    webhookConfigs:
-   - url: 'https://webhook.site/YOUR-UNIQUE-ID'
+   - url: 'https://webhook-test.com/YOUR-UNIQUE-ID'
    ```
 4. Reapply the configuration:
    ```bash
    kubectl apply -f alerts/alertmanager-webhook.yaml
    ```
 
-When alerts fire, you'll see the full alert payload (including correlation ID and Grafana URL) at your webhook.site URL.
+When alerts fire, you'll see the full alert payload (including correlation ID and Grafana URL) at your webhook-test.com URL.
 
 ---
 
